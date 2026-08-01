@@ -2,11 +2,14 @@
 
 namespace Rushing\AuthVault;
 
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Rushing\AuthVault\Contracts\OAuthTokenRefresher;
+use Rushing\AuthVault\Contracts\VaultContextGuard;
 use Rushing\AuthVault\Data\SecretData;
+use Rushing\AuthVault\Events\VaultSecretResolved;
 use Rushing\AuthVault\Models\VaultSecret;
 
 /**
@@ -23,6 +26,11 @@ use Rushing\AuthVault\Models\VaultSecret;
  */
 class AuthVault
 {
+    public function __construct(
+        private VaultContextGuard $context,
+        private ?Dispatcher $events = null,
+    ) {}
+
     /**
      * Store a secret, rotating: supersede the current active row for this
      * (conduit_id, scheme) and append a fresh active one. Use for the first store and
@@ -36,6 +44,11 @@ class AuthVault
         ?string $providerAccountId = null,
         ?string $keyId = null,
     ): VaultSecret {
+        // Defense-in-depth (V1): a write must resolve against an established owner
+        // partition — never fall through to an unscoped one where a known conduit_id
+        // supersedes/writes a foreign owner's row.
+        $this->context->assert($conduitId, 'write');
+
         return DB::transaction(function () use ($conduitId, $scheme, $payload, $expiresAt, $providerAccountId, $keyId) {
             VaultSecret::query()
                 ->where('conduit_id', $conduitId)
@@ -59,11 +72,24 @@ class AuthVault
      */
     public function active(string $conduitId, string $scheme): ?VaultSecret
     {
-        return VaultSecret::query()
+        // Defense-in-depth (V1): the vault isolates by row *placement* (per-owner
+        // partition — a per-tenant schema in the host). That is airtight only while a
+        // read runs inside a resolved owner context; a read with none established falls
+        // through to the default partition and a caller who knows a conduit_id resolves
+        // whatever lives there. Assert the context before the lookup can resolve.
+        $this->context->assert($conduitId, 'read');
+
+        $secret = VaultSecret::query()
             ->where('conduit_id', $conduitId)
             ->where('scheme', $scheme)
             ->whereNull('superseded_at')
             ->first();
+
+        // Cheap read-audit hook: emit which (conduit, scheme) was resolved and whether a
+        // secret was found. A host wires this to its audit log; unbound = free no-op.
+        $this->events?->dispatch(new VaultSecretResolved($conduitId, $scheme, $secret !== null));
+
+        return $secret;
     }
 
     /**

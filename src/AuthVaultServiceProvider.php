@@ -3,12 +3,20 @@
 namespace Rushing\AuthVault;
 
 use Illuminate\Support\ServiceProvider;
+use Rushing\AuthVault\Contracts\VaultContextGuard;
+use Rushing\AuthVault\Guards\NullVaultContextGuard;
 
 class AuthVaultServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/auth-vault.php', 'auth-vault');
+
+        // Defense-in-depth partition guard (V1). The packaged default is a no-op so
+        // single-tenant / un-partitioned consumers are unchanged; a multi-tenant host
+        // rebinds this to assert its partition context (e.g. a resolved tenant schema)
+        // is established before a conduit_id lookup can resolve.
+        $this->app->bindIf(VaultContextGuard::class, NullVaultContextGuard::class);
 
         $this->app->singleton(AuthVault::class);
     }
