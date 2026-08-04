@@ -2,8 +2,10 @@
 
 namespace Rushing\AuthVault;
 
+use Illuminate\Foundation\AliasLoader;
 use Illuminate\Support\ServiceProvider;
 use Rushing\AuthVault\Contracts\VaultContextGuard;
+use Rushing\AuthVault\Facades\AuthVault as AuthVaultFacade;
 use Rushing\AuthVault\Guards\NullVaultContextGuard;
 
 class AuthVaultServiceProvider extends ServiceProvider
@@ -23,6 +25,10 @@ class AuthVaultServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if (class_exists(AliasLoader::class)) {
+            AliasLoader::getInstance()->alias('AuthVault', AuthVaultFacade::class);
+        }
+
         $this->publishes([
             __DIR__.'/../config/auth-vault.php' => config_path('auth-vault.php'),
         ], 'auth-vault-config');
