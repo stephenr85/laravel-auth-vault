@@ -11,9 +11,14 @@ use Rushing\AuthVault\Tests\Support\PartitionScopedContextGuard;
  * V1 hardening (sourced-particles ticket 10). The vault isolates secrets by physical row
  * *placement* — the owner's partition (a per-tenant Postgres schema in the host). That is
  * airtight while every access runs inside a resolved owner context, but has one residual
- * gap: an access with NO context established falls through to the default partition, and a
- * caller who knows a conduit_id resolves whatever lives there. These tests prove the
- * {@see VaultContextGuard} defense-in-depth backstop closes that gap.
+ * gap: an access with NO context established resolves against the default partition, and a
+ * caller who knows a conduit_id resolves whatever lives there.
+ *
+ * That gap is host-conditional — it is live only where the table exists in the default
+ * partition (see {@see VaultContextGuard}'s docblock for the condition and the measurement).
+ * These tests model that host: the un-partitioned single-table shape below is the worst case
+ * the guard is specified against, not a claim about every host. They prove the
+ * {@see VaultContextGuard} defense-in-depth backstop closes the gap where it exists.
  */
 function vaultWithGuard(VaultContextGuard $guard): AuthVault
 {

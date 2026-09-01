@@ -45,8 +45,10 @@ class AuthVault
         ?string $keyId = null,
     ): VaultSecret {
         // Defense-in-depth (V1): a write must resolve against an established owner
-        // partition — never fall through to an unscoped one where a known conduit_id
-        // supersedes/writes a foreign owner's row.
+        // partition — never against an unscoped one, where a known conduit_id could
+        // supersede/write a foreign owner's row. Host-conditional: that only happens at a
+        // host carrying an un-namespaced table in the default partition. See
+        // VaultContextGuard's docblock for the condition and the measurement.
         $this->context->assert($conduitId, 'write');
 
         return DB::transaction(function () use ($conduitId, $scheme, $payload, $expiresAt, $providerAccountId, $keyId) {
@@ -74,9 +76,11 @@ class AuthVault
     {
         // Defense-in-depth (V1): the vault isolates by row *placement* (per-owner
         // partition — a per-tenant schema in the host). That is airtight only while a
-        // read runs inside a resolved owner context; a read with none established falls
-        // through to the default partition and a caller who knows a conduit_id resolves
-        // whatever lives there. Assert the context before the lookup can resolve.
+        // read runs inside a resolved owner context; a read with none established
+        // resolves against the default partition, and at a host that carries an
+        // un-namespaced table there, a caller who knows a conduit_id resolves whatever
+        // lives in it. Host-conditional — see VaultContextGuard's docblock for the
+        // condition and the measurement. Assert the context before the lookup can resolve.
         $this->context->assert($conduitId, 'read');
 
         $secret = VaultSecret::query()

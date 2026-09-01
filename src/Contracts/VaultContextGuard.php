@@ -11,8 +11,19 @@ use Rushing\AuthVault\Exceptions\VaultContextException;
  * per-tenant Postgres schema) and relies on that placement — not a policy column — for
  * cross-tenant isolation. That is correct-by-construction *as long as* every read runs
  * inside a resolved owner context. The one residual gap (V1): a read that runs with NO
- * context established falls through to the default partition (e.g. Postgres `public`),
+ * context established **resolves against the default partition** (e.g. Postgres `public`),
  * and a caller who knows a `conduit_id` then resolves whatever lives there.
+ *
+ * That gap is **host-conditional**, and the condition is where the table was published. It
+ * is live at a host that puts an un-namespaced `vault_secrets` table in the default partition —
+ * publishing this package's own migration stub centrally does exactly that. It is NOT live
+ * at a host that publishes the table per-partition only: there, an uncontexted read finds no
+ * relation at all and raises `SQLSTATE[42P01]` (measured 2026-08-31 at
+ * `~/Herd/splicewire-app` — the table is in every tenant schema and in none of `public`).
+ * Note also that there is no *fall-through* in this direction: on Postgres a `search_path`
+ * of `"<tenant_schema>,public"` falls through outward, tenant → public, never inward.
+ * So the guard is a fail-closed precondition whose value is conditional on host config —
+ * which is the argument for keeping it, not for removing it.
  *
  * This guard closes that gap without adding an ownership column (which ADR-0084 rejects).
  * A host binds an implementation that asserts a partition context is actually established
