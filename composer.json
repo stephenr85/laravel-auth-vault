@@ -1,6 +1,6 @@
 {
     "name": "rushing/laravel-auth-vault",
-    "description": "A generic per-tenant credential vault for Laravel — encrypted, append-only secret storage with safe rotation and an OAuth token-refresh primitive. Stores API keys and OAuth tokens; knows nothing of connectors, tenancy, or billing.",
+    "description": "A generic per-tenant credential vault for Laravel \u2014 encrypted, append-only secret storage with safe rotation and an OAuth token-refresh primitive. Stores API keys and OAuth tokens; knows nothing of connectors, tenancy, or billing.",
     "keywords": [
         "laravel",
         "credentials",
@@ -19,6 +19,13 @@
         }
     ],
     "repositories": [
+        {
+            "type": "path",
+            "url": "../laravel-schema-convergence",
+            "options": {
+                "symlink": true
+            }
+        },
         {
             "type": "git",
             "url": "https://github.com/stephenr85/laravel-schema-convergence.git"
