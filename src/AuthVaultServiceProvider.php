@@ -43,6 +43,28 @@ class AuthVaultServiceProvider extends ServiceProvider
 
     protected function publishedMigrationPath(): string
     {
-        return database_path('migrations/tenant/'.date('Y_m_d_His').'_create_vault_secrets_table.php');
+        $directory = database_path('migrations/tenant');
+        $suffix = '_create_vault_secrets_table.php';
+
+        // Resolve onto a copy the host already has, so re-publishing is idempotent. Without this the
+        // path below mints a FRESH timestamp on every publish, and `publishes()` runs at boot, so a
+        // host that already tracks this migration silently gets a SECOND file creating the same table
+        // — which is what a clean `composer setup` was producing. spatie/laravel-package-tools does
+        // this same same-stem lookup in `generateMigrationName()`; this package hand-rolls its
+        // destination and so has to do it too.
+        //
+        // Earliest match wins, so the answer is stable once a host has (as some do) accumulated more
+        // than one copy. Returning an existing path also means `vendor:publish --force` OVERWRITES
+        // that file rather than adding another — deliberate, and the same bargain package-tools makes,
+        // but it is why --force must not be pointed at a host-authored variant of this table.
+        $existing = glob($directory.'/*'.$suffix);
+
+        if ($existing !== false && $existing !== []) {
+            sort($existing);
+
+            return $existing[0];
+        }
+
+        return $directory.'/'.date('Y_m_d_His').$suffix;
     }
 }
