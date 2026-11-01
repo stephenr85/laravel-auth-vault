@@ -2,6 +2,8 @@
 
 namespace Rushing\AuthVault\Data;
 
+use Spatie\LaravelData\Attributes\MapName;
+
 /**
  * A bring-your-own LLM provider key (OpenAI/Anthropic/etc.) — its own scheme, never
  * confused with a vendor token. Stored `scheme=llm-key`.
@@ -15,6 +17,7 @@ class LlmKeySecretData extends SecretData
     public function __construct(
         public string $provider,
         public string $key,
-        public ?string $base_url = null,
+        #[MapName('base_url')]
+        public ?string $baseUrl = null,
     ) {}
 }
